@@ -1,0 +1,1 @@
+recursive-include nemi_ai/server/frontend/out *
