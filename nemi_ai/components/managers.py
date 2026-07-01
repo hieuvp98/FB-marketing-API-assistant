@@ -7,6 +7,7 @@ from weaviate.classes.query import Filter, Sort, MetadataQuery
 from weaviate.collections.classes.data import DataObject
 from weaviate.classes.aggregate import GroupByAggregate
 from weaviate.classes.init import AdditionalConfig, Timeout
+from weaviate.classes.config import Property, DataType, Configure
 
 import os
 import asyncio
@@ -102,7 +103,7 @@ if production != "Production":
         JSONChunker(),
     ]
     embedders = [
-        SentenceTransformersEmbedder(),
+        OllamaEmbedder(),
         WeaviateEmbedder(),
         UpstageEmbedder(),
         VoyageAIEmbedder(),
@@ -181,7 +182,7 @@ class WeaviateManager:
         else:
             raise Exception("No URL or API Key provided")
 
-    async def connect_to_docker(self, w_url, port="8080"):
+    async def connect_to_docker(self, w_url, port="8177"):
         msg.info(f"Connecting to Weaviate Docker")
         return weaviate.use_async_with_local(
             host=w_url,
@@ -227,7 +228,7 @@ class WeaviateManager:
         )
 
     async def connect(
-        self, deployment: str, weaviateURL: str, weaviateAPIKey: str, port: str = "8080"
+        self, deployment: str, weaviateURL: str, weaviateAPIKey: str, port: str = "8177"
     ) -> WeaviateAsyncClient:
         try:
 
@@ -304,13 +305,17 @@ class WeaviateManager:
     ### Collection Handling
 
     async def verify_collection(
-        self, client: WeaviateAsyncClient, collection_name: str
+        self, client: WeaviateAsyncClient, collection_name: str, properties: list = None
     ):
         if not await client.collections.exists(collection_name):
             msg.info(
                 f"Collection: {collection_name} does not exist, creating new collection."
             )
-            returned_collection = await client.collections.create(name=collection_name)
+            kwargs = {"name": collection_name}
+            if properties:
+                kwargs["properties"] = properties
+                kwargs["vectorizer_config"] = Configure.Vectorizer.none()
+            returned_collection = await client.collections.create(**kwargs)
             if returned_collection:
                 return True
             else:
@@ -323,7 +328,20 @@ class WeaviateManager:
             self.embedding_table[embedder] = "NEMI_Embedding_" + re.sub(
                 r"[^a-zA-Z0-9]", "_", embedder
             )
-            return await self.verify_collection(client, self.embedding_table[embedder])
+            embedder_properties = [
+                Property(name="content", data_type=DataType.TEXT),
+                Property(name="chunk_id", data_type=DataType.INT),
+                Property(name="doc_uuid", data_type=DataType.TEXT),
+                Property(name="title", data_type=DataType.TEXT),
+                Property(name="pca", data_type=DataType.NUMBER_ARRAY),
+                Property(name="start_i", data_type=DataType.INT),
+                Property(name="end_i", data_type=DataType.INT),
+                Property(name="content_without_overlap", data_type=DataType.TEXT),
+                Property(name="labels", data_type=DataType.TEXT_ARRAY),
+            ]
+            return await self.verify_collection(
+                client, self.embedding_table[embedder], properties=embedder_properties
+            )
         else:
             return True
 

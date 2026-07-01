@@ -53,7 +53,7 @@ class NemiManager:
         self.verify_installed_libraries()
         self.verify_variables()
 
-    async def connect(self, credentials: Credentials, port: str = "8080"):
+    async def connect(self, credentials: Credentials, port: str = "8177"):
         start_time = asyncio.get_event_loop().time()
         try:
             client = await self.weaviate_manager.connect(
@@ -769,7 +769,7 @@ class ClientManager:
             msg.info(f"Client {cred_hash} connected at {client['timestamp']}")
 
     async def connect(
-        self, credentials: Credentials, port: str = "8080"
+        self, credentials: Credentials, port: str = "8177"
     ) -> WeaviateAsyncClient:
 
         _credentials = credentials
