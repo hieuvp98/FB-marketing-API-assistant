@@ -65,13 +65,19 @@ def ensure_collection(
     vector_size: int = DEFAULT_VECTOR_SIZE,
     distance: Distance = Distance.COSINE,
 ) -> bool:
-    """Create collection if it doesn't exist. Returns True if created."""
+    """Create collection if it doesn't exist. Returns True if created.
+
+    For non-embedding collections (documents, config, suggestions),
+    set ``vector_size`` to a small positive value so Qdrant >=1.18
+    accepts the VectorParams.
+    """
     collections = [c.name for c in client.get_collections().collections]
     if collection_name not in collections:
+        size = max(vector_size, 4)  # Qdrant >=1.18 rejects size=0
         client.create_collection(
             collection_name=collection_name,
             vectors_config=VectorParams(
-                size=vector_size,
+                size=size,
                 distance=distance,
             ),
             hnsw_config=HnswConfigDiff(
@@ -88,19 +94,19 @@ def ensure_collection(
 
 def ensure_documents_collection(client: QdrantClient) -> str:
     """Ensure documents collection exists, return name."""
-    ensure_collection(client, DOCUMENTS_COLLECTION, vector_size=0)
+    ensure_collection(client, DOCUMENTS_COLLECTION, vector_size=4)
     return DOCUMENTS_COLLECTION
 
 
 def ensure_config_collection(client: QdrantClient) -> str:
     """Ensure config collection exists, return name."""
-    ensure_collection(client, CONFIG_COLLECTION, vector_size=0)
+    ensure_collection(client, CONFIG_COLLECTION, vector_size=4)
     return CONFIG_COLLECTION
 
 
 def ensure_suggestions_collection(client: QdrantClient) -> str:
     """Ensure suggestions collection exists, return name."""
-    ensure_collection(client, SUGGESTIONS_COLLECTION, vector_size=0)
+    ensure_collection(client, SUGGESTIONS_COLLECTION, vector_size=4)
     return SUGGESTIONS_COLLECTION
 
 

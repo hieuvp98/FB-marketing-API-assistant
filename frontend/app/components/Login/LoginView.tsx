@@ -252,7 +252,7 @@ const LoginView: React.FC<LoginViewProps> = ({
               color="#FAFAFA"
               useMaterial={production == "Local" ? false : true}
               model_path={
-                production == "Local" ? "/nemi.glb" : "/weaviate.glb"
+                "/macbook.gltf"
               }
             />
           </Canvas>

@@ -100,13 +100,13 @@ if production != "Production":
         JSONChunker(),
     ]
     embedders = [
+        OpenAIEmbedder(),
         SentenceTransformersEmbedder(),
         OllamaEmbedder(),
         WeaviateEmbedder(),
         UpstageEmbedder(),
         VoyageAIEmbedder(),
         CohereEmbedder(),
-        OpenAIEmbedder(),
     ]
     retrievers = [WindowRetriever()]
     generators = [

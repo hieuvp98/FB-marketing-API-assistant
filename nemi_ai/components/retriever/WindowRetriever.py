@@ -1,3 +1,9 @@
+"""WindowRetriever — retrieves chunks and their surrounding context.
+
+Qdrant ScoredPoint adaptation: payload replaces properties,
+score replaces metadata.score, id replaces uuid.
+"""
+
 from nemi_ai.components.interfaces import Retriever
 from nemi_ai.components.types import InputConfig
 
@@ -78,32 +84,31 @@ class WindowRetriever(Retriever):
         if len(chunks) == 0:
             return ([], "We couldn't find any chunks to the query")
 
-        # Group Chunks by document and sum score
+        # Qdrant ScoredPoint: use .payload instead of .properties, .score instead of .metadata.score
         doc_map = {}
         scores = [0]
         for chunk in chunks:
-            if chunk.properties["doc_uuid"] not in doc_map:
-                document = await qdrant_manager.get_document(
-                    client, chunk.properties["doc_uuid"]
-                )
+            doc_uuid = str(chunk.payload.get("doc_uuid", ""))
+            if doc_uuid not in doc_map:
+                document = await qdrant_manager.get_document(client, doc_uuid)
                 if document is None:
                     continue
-                doc_map[chunk.properties["doc_uuid"]] = {
-                    "title": document["title"],
+                doc_map[doc_uuid] = {
+                    "title": document.get("title", ""),
                     "chunks": [],
                     "score": 0,
-                    "metadata": document["metadata"],
+                    "metadata": document.get("metadata", ""),
                 }
-            doc_map[chunk.properties["doc_uuid"]]["chunks"].append(
+            doc_map[doc_uuid]["chunks"].append(
                 {
-                    "uuid": str(chunk.uuid),
-                    "score": chunk.metadata.score,
-                    "chunk_id": chunk.properties["chunk_id"],
-                    "content": chunk.properties["content"],
+                    "uuid": str(chunk.id),
+                    "score": chunk.score,
+                    "chunk_id": chunk.payload.get("chunk_id", 0),
+                    "content": chunk.payload.get("content", ""),
                 }
             )
-            doc_map[chunk.properties["doc_uuid"]]["score"] += chunk.metadata.score
-            scores.append(chunk.metadata.score)
+            doc_map[doc_uuid]["score"] += chunk.score
+            scores.append(chunk.score)
         min_score = min(scores)
         max_score = max(scores)
 
@@ -111,10 +116,8 @@ class WindowRetriever(Retriever):
             return (value - min_value) / (max_value - min_value)
 
         def generate_window_list(value, window):
-
             value = int(value)
             window = int(window)
-            # Create a range of values around the given value, excluding the original value
             return [i for i in range(value - window, value + window + 1) if i != value]
 
         documents = []
@@ -122,13 +125,11 @@ class WindowRetriever(Retriever):
 
         for doc in doc_map:
             additional_chunk_ids = []
-            chunks_above_threshold = 0
             for chunk in doc_map[doc]["chunks"]:
                 normalized_score = normalize_value(
                     float(chunk["score"]), float(max_score), float(min_score)
                 )
                 if window_threshold <= normalized_score:
-                    chunks_above_threshold += 1
                     additional_chunk_ids += generate_window_list(
                         chunk["chunk_id"], window
                     )
@@ -142,16 +143,17 @@ class WindowRetriever(Retriever):
                     chunk["chunk_id"] for chunk in doc_map[doc]["chunks"]
                 )
                 for chunk in additional_chunks:
-                    if chunk.properties["chunk_id"] not in existing_chunk_ids:
+                    cid = chunk.payload.get("chunk_id")
+                    if cid is not None and cid not in existing_chunk_ids:
                         doc_map[doc]["chunks"].append(
                             {
-                                "uuid": str(chunk.uuid),
+                                "uuid": str(chunk.id),
                                 "score": 0,
-                                "chunk_id": chunk.properties["chunk_id"],
-                                "content": chunk.properties["content"],
+                                "chunk_id": cid,
+                                "content": chunk.payload.get("content", ""),
                             }
                         )
-                        existing_chunk_ids.add(chunk.properties["chunk_id"])
+                        existing_chunk_ids.add(cid)
 
             _chunks = [
                 {
@@ -204,7 +206,6 @@ class WindowRetriever(Retriever):
         return (sorted_documents, context)
 
     def combine_context(self, documents: list[dict]) -> str:
-
         context = ""
 
         for document in documents:

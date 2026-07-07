@@ -823,7 +823,7 @@ class QdrantManager:
             collection_name=col,
             points=[
                 PointStruct(
-                    id=None,
+                    id=str(uuid.uuid4()),
                     vector=[0.0] * 4,
                     payload={
                         "query": query,
