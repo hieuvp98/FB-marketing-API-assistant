@@ -24,7 +24,7 @@ import {
   DarkTheme,
   DocumentFilter,
   WCDTheme,
-  WeaviateTheme,
+  QdrantTheme,
 } from "./types";
 
 // Utilities
@@ -43,10 +43,10 @@ export default function Home() {
   const [themes, setThemes] = useState<Themes>({
     Light: LightTheme,
     Dark: DarkTheme,
-    Weaviate: WeaviateTheme,
+    Qdrant: QdrantTheme,
     WCD: WCDTheme,
   });
-  const [selectedTheme, setSelectedTheme] = useState<Theme>(themes["Weaviate"]);
+  const [selectedTheme, setSelectedTheme] = useState<Theme>(themes["Qdrant"]);
 
   const fontKey = selectedTheme.font.value as FontKey; // Safely cast if you're sure, or use a check
   const fontClassName = fontKey ? fonts[fontKey]?.className || "" : "";
@@ -80,8 +80,8 @@ export default function Home() {
         setIsHealthy(true);
         setCredentials({
           deployment: "Local",
-          url: health_data.deployments.WEAVIATE_URL_NEMI,
-          key: health_data.deployments.WEAVIATE_API_KEY_NEMI,
+          url: health_data.deployments.QDRANT_HOST,
+          key: health_data.deployments.QDRANT_API_KEY,
           default_deployment: health_data.default_deployment,
         });
       } else {
@@ -135,30 +135,30 @@ export default function Home() {
     const themeToUse = selectedTheme;
     const cssVars = {
       "--primary-nemi":
-        themeToUse.primary_color?.color || WeaviateTheme.primary_color.color,
+        themeToUse.primary_color?.color || QdrantTheme.primary_color.color,
       "--secondary-nemi":
         themeToUse.secondary_color?.color ||
-        WeaviateTheme.secondary_color.color,
+        QdrantTheme.secondary_color.color,
       "--warning-nemi":
-        themeToUse.warning_color?.color || WeaviateTheme.warning_color.color,
-      "--bg-nemi": themeToUse.bg_color?.color || WeaviateTheme.bg_color.color,
+        themeToUse.warning_color?.color || QdrantTheme.warning_color.color,
+      "--bg-nemi": themeToUse.bg_color?.color || QdrantTheme.bg_color.color,
       "--bg-alt-nemi":
-        themeToUse.bg_alt_color?.color || WeaviateTheme.bg_alt_color.color,
+        themeToUse.bg_alt_color?.color || QdrantTheme.bg_alt_color.color,
       "--text-nemi":
-        themeToUse.text_color?.color || WeaviateTheme.text_color.color,
+        themeToUse.text_color?.color || QdrantTheme.text_color.color,
       "--text-alt-nemi":
-        themeToUse.text_alt_color?.color || WeaviateTheme.text_alt_color.color,
+        themeToUse.text_alt_color?.color || QdrantTheme.text_alt_color.color,
       "--button-nemi":
-        themeToUse.button_color?.color || WeaviateTheme.button_color.color,
+        themeToUse.button_color?.color || QdrantTheme.button_color.color,
       "--button-hover-nemi":
         themeToUse.button_hover_color?.color ||
-        WeaviateTheme.button_hover_color.color,
+        QdrantTheme.button_hover_color.color,
       "--text-nemi-button":
         themeToUse.button_text_color?.color ||
-        WeaviateTheme.button_text_color.color,
+        QdrantTheme.button_text_color.color,
       "--text-alt-nemi-button":
         themeToUse.button_text_alt_color?.color ||
-        WeaviateTheme.button_text_alt_color.color,
+        QdrantTheme.button_text_alt_color.color,
     };
     Object.entries(cssVars).forEach(([key, value]) => {
       document.documentElement.style.setProperty(key, value);
@@ -280,7 +280,7 @@ export default function Home() {
             className={`footer footer-center p-4 mt-8 bg-bg-nemi text-text-alt-nemi transition-all duration-1500 delay-1000`}
           >
             <aside>
-              <p>Build with ♥ and Weaviate © 2024</p>
+              <p>Build with ♥ and Qdrant © 2024</p>
             </aside>
           </div>
         </div>

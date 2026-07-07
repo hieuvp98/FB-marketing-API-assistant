@@ -7,7 +7,6 @@ from nemi_ai.components.types import InputConfig
 from dotenv import load_dotenv
 
 from wasabi import msg
-from weaviate import Client
 
 load_dotenv()
 
@@ -82,7 +81,7 @@ class Embedding(NemiComponent):
         self.max_batch_size = 128
 
     async def vectorize(self, config: dict, content: list[str]) -> list[float]:
-        """Embed Nemi-AI documents and its chunks to Weaviate
+        """Embed Nemi-AI documents and its chunks
         @parameter: config : dict - Embedder Configuration
         @parameter: content : list[str] - List of strings to embed
         @return: list[float] - List of embeddings
@@ -136,7 +135,7 @@ class Retriever(NemiComponent):
         query,
         vector,
         config,
-        weaviate_manager,
+        qdrant_manager,
         embedder,
         labels,
         document_uuids,

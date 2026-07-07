@@ -154,12 +154,12 @@ const LoginView: React.FC<LoginViewProps> = ({
   const [errorText, setErrorText] = useState("");
 
   const [selectedDeployment, setSelectedDeployment] = useState<
-    "Weaviate" | "Docker" | "Local" | "Custom"
+    "Qdrant" | "Docker" | "Local" | "Custom"
   >("Local");
 
-  const [weaviateURL, setWeaviateURL] = useState(credentials.url);
-  const [weaviateAPIKey, setWeaviateAPIKey] = useState(credentials.key);
-  const [port, setPort] = useState("8177");
+  const [qdrantHost, setQdrantHost] = useState(credentials.url);
+  const [qdrantApiKey, setQdrantApiKey] = useState(credentials.key);
+  const [port, setPort] = useState("6333");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -177,14 +177,14 @@ const LoginView: React.FC<LoginViewProps> = ({
   }, [credentials]);
 
   const connect = async (
-    deployment: "Local" | "Weaviate" | "Docker" | "Custom"
+    deployment: "Local" | "Qdrant" | "Docker" | "Custom"
   ) => {
     setErrorText("");
     setIsConnecting(true);
     const response = await connectToNemi(
       deployment,
-      weaviateURL,
-      weaviateAPIKey,
+      qdrantHost,
+      qdrantApiKey,
       port
     );
     if (response) {
@@ -194,14 +194,14 @@ const LoginView: React.FC<LoginViewProps> = ({
       } else if (response.connected == false) {
         setIsLoggedIn(false);
         setErrorText(
-          response.error == "" ? "Couldn't connect to Weaviate" : response.error
+          response.error == "" ? "Couldn't connect to Qdrant" : response.error
         );
       } else {
         setIsLoggedIn(true);
         setCredentials({
           deployment: deployment,
-          key: weaviateAPIKey,
-          url: weaviateURL,
+          key: qdrantApiKey,
+          url: qdrantHost,
           default_deployment: credentials.default_deployment,
         });
         setRAGConfig(response.rag_config);
@@ -280,11 +280,11 @@ const LoginView: React.FC<LoginViewProps> = ({
                   <div className="flex flex-col justify-start gap-2 w-full">
                     <NemiButton
                       Icon={FaDatabase}
-                      title="Weaviate"
+                      title="Qdrant"
                       disabled={isConnecting}
                       onClick={() => {
                         setSelectStage(false);
-                        setSelectedDeployment("Weaviate");
+                        setSelectedDeployment("Qdrant");
                       }}
                     />
                     <NemiButton
@@ -326,10 +326,10 @@ const LoginView: React.FC<LoginViewProps> = ({
                       title="Start Demo"
                       disabled={isConnecting}
                       onClick={() => {
-                        setSelectedDeployment("Weaviate");
-                        connect("Weaviate");
+                        setSelectedDeployment("Qdrant");
+                        connect("Qdrant");
                       }}
-                      loading={isConnecting && selectedDeployment == "Weaviate"}
+                      loading={isConnecting && selectedDeployment == "Qdrant"}
                     />
                   </div>
                 )}
@@ -340,7 +340,7 @@ const LoginView: React.FC<LoginViewProps> = ({
                       title="Start Nemi-AI"
                       onClick={() => {
                         setSelectStage(false);
-                        setSelectedDeployment("Weaviate");
+                        setSelectedDeployment("Qdrant");
                       }}
                     />
                   </div>
@@ -362,9 +362,9 @@ const LoginView: React.FC<LoginViewProps> = ({
                           <input
                             type="text"
                             name="username"
-                            value={weaviateURL}
-                            onChange={(e) => setWeaviateURL(e.target.value)}
-                            placeholder="Weaviate URL"
+                            value={qdrantHost}
+                            onChange={(e) => setQdrantHost(e.target.value)}
+                            placeholder="Qdrant Host"
                             className="grow bg-button-nemi text-text-alt-nemi hover:text-text-nemi w-full"
                             autoComplete="username"
                           />
@@ -390,8 +390,8 @@ const LoginView: React.FC<LoginViewProps> = ({
                         <input
                           type="password"
                           name="current-password"
-                          value={weaviateAPIKey}
-                          onChange={(e) => setWeaviateAPIKey(e.target.value)}
+                          value={qdrantApiKey}
+                          onChange={(e) => setQdrantApiKey(e.target.value)}
                           placeholder="API Key"
                           className="grow bg-button-nemi text-text-alt-nemi hover:text-text-nemi w-full"
                           autoComplete="current-password"
@@ -402,13 +402,13 @@ const LoginView: React.FC<LoginViewProps> = ({
                           <div className="flex flex-col justify-start gap-2 w-full">
                             <NemiButton
                               Icon={GrConnect}
-                              title="Connect to Weaviate"
+                              title="Connect to Qdrant"
                               type="submit"
                               selected={true}
                               selected_color="bg-primary-nemi"
                               loading={isConnecting}
                             />
-                            {selectedDeployment == "Weaviate" && (
+                            {selectedDeployment == "Qdrant" && (
                               <NemiButton
                                 Icon={CgWebsite}
                                 title="Register"
@@ -416,7 +416,7 @@ const LoginView: React.FC<LoginViewProps> = ({
                                 disabled={isConnecting}
                                 onClick={() =>
                                   window.open(
-                                    "https://console.weaviate.cloud",
+                                    "https://qdrant.tech",
                                     "_blank"
                                   )
                                 }

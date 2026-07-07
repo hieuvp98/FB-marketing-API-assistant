@@ -51,18 +51,18 @@ def start(port, host, prod, workers):
 
 @click.option(
     "--url",
-    default=os.getenv("WEAVIATE_URL_NEMI"),
-    help="Weaviate URL",
+    default=os.getenv("QDRANT_HOST"),
+    help="Qdrant Host",
 )
 @click.option(
     "--api_key",
-    default=os.getenv("WEAVIATE_API_KEY_NEMI"),
-    help="Weaviate API Key",
+    default=os.getenv("QDRANT_API_KEY"),
+    help="Qdrant API Key",
 )
 @click.option(
     "--deployment",
     default="",
-    help="Deployment (Local, Weaviate, Docker)",
+    help="Deployment (Local, Qdrant, Docker)",
 )
 @click.option(
     "--full_reset",
@@ -80,9 +80,9 @@ def reset(url, api_key, deployment, full_reset):
 
     async def async_reset():
         if url is not None and api_key is not None:
-            if deployment == "" or deployment == "Weaviate":
+            if deployment == "" or deployment == "Qdrant":
                 client = await manager.connect(
-                    Credentials(deployment="Weaviate", url=url, key=api_key)
+                    Credentials(deployment="Qdrant", url=url, key=api_key)
                 )
             elif deployment == "Docker":
                 client = await manager.connect(
@@ -103,7 +103,7 @@ def reset(url, api_key, deployment, full_reset):
             await manager.reset_theme_config(client)
             await manager.reset_user_config(client)
         else:
-            await manager.weaviate_manager.delete_all(client)
+            await manager.qdrant_manager.delete_all(client)
 
         await client.close()
 

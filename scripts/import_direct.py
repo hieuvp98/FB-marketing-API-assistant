@@ -10,7 +10,7 @@ sys.path.insert(0, "/app")
 
 from nemi_ai.server.types import FileConfig, FileStatus, Credentials
 from nemi_ai.server.helpers import LoggerManager
-from nemi_ai.components.managers import WeaviateManager
+from nemi_ai.components.managers import QdrantManager
 from nemi_ai import nemi_manager
 
 class DummyWS:
@@ -23,14 +23,10 @@ class DummyWS:
 async def main():
     import_dir = sys.argv[1] if len(sys.argv) > 1 else "/tmp/import_data"
 
-    # Connect to Weaviate
-    print("Connecting to Weaviate...")
-    wm = WeaviateManager()
-    client = await wm.connect_to_docker("weaviate", "8177")
-    await client.connect()
-    if not await client.is_ready():
-        print("Failed to connect to Weaviate")
-        return
+    # Connect to Qdrant
+    print("Connecting to Qdrant...")
+    qm = QdrantManager()
+    client = await qm.connect(host="qdrant", port=6333)
     print("Connected!")
 
     # Create NemiManager to get a proper RAG config
@@ -43,10 +39,6 @@ async def main():
     print(f"  Chunker: {rag_config['Chunker']['selected']}")
     print(f"  Embedder: {rag_config['Embedder']['selected']}")
     print(f"  Generator: {rag_config['Generator']['selected']}")
-
-    # Make sure NEMI_CONFIGURATION collection exists
-    config_exists = await wm.verify_collection(client, wm.config_collection_name)
-    print(f"Config collection ready: {config_exists}")
 
     # Import files
     md_files = sorted([
@@ -84,15 +76,15 @@ async def main():
 
     # Verify
     print("\n--- Verification ---")
-    collections = await client.collections.list_all()
-    for name in collections:
+    collections = client.get_collections().collections
+    for col in collections:
         try:
-            c = await client.collections.get(name).length()
-            print(f"  {name}: {c} objects")
+            count = client.count(collection_name=col.name, exact=True).count
+            print(f"  {col.name}: {count} points")
         except Exception as e:
-            print(f"  {name}: error - {e}")
+            print(f"  {col.name}: error - {e}")
 
-    await client.close()
+    client.close()
 
 if __name__ == "__main__":
     asyncio.run(main())

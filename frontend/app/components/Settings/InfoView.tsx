@@ -130,7 +130,7 @@ const InfoView: React.FC<InfoViewProps> = ({
               />
             </div>
           </div>
-          <p className="font-bold text-lg">Weaviate Information</p>
+          <p className="font-bold text-lg">Qdrant Information</p>
 
           <div className="flex flex-col border-2 gap-2 border-bg-nemi shadow-sm p-4 rounded-lg">
             <p className="text-sm lg:text-base font-semibold text-text-alt-nemi">
@@ -151,7 +151,7 @@ const InfoView: React.FC<InfoViewProps> = ({
               Version
             </p>
             {nodePayload ? (
-              <p className="text-text-nemi">{nodePayload.weaviate_version}</p>
+              <p className="text-text-nemi">{nodePayload.qdrant_version}</p>
             ) : (
               <span className="loading loading-spinner loading-sm"></span>
             )}

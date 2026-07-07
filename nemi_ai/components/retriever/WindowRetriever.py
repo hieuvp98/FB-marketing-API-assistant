@@ -9,7 +9,7 @@ class WindowRetriever(Retriever):
 
     def __init__(self):
         super().__init__()
-        self.description = "Retrieve relevant chunks from Weaviate"
+        self.description = "Retrieve relevant chunks from Qdrant"
         self.name = "Advanced"
 
         self.config["Search Mode"] = InputConfig(
@@ -49,7 +49,7 @@ class WindowRetriever(Retriever):
         query,
         vector,
         config,
-        weaviate_manager,
+        qdrant_manager,
         embedder,
         labels,
         document_uuids,
@@ -63,7 +63,7 @@ class WindowRetriever(Retriever):
         window_threshold /= 100
 
         if search_mode == "Hybrid Search":
-            chunks = await weaviate_manager.hybrid_chunks(
+            chunks = await qdrant_manager.hybrid_chunks(
                 client,
                 embedder,
                 query,
@@ -83,7 +83,7 @@ class WindowRetriever(Retriever):
         scores = [0]
         for chunk in chunks:
             if chunk.properties["doc_uuid"] not in doc_map:
-                document = await weaviate_manager.get_document(
+                document = await qdrant_manager.get_document(
                     client, chunk.properties["doc_uuid"]
                 )
                 if document is None:
@@ -135,7 +135,7 @@ class WindowRetriever(Retriever):
             unique_chunk_ids = set(additional_chunk_ids)
 
             if len(unique_chunk_ids) > 0:
-                additional_chunks = await weaviate_manager.get_chunk_by_ids(
+                additional_chunks = await qdrant_manager.get_chunk_by_ids(
                     client, embedder, doc, unique_chunk_ids
                 )
                 existing_chunk_ids = set(

@@ -1,8 +1,8 @@
 export type Credentials = {
-  deployment: "Weaviate" | "Docker" | "Local" | "Custom";
+  deployment: "Qdrant" | "Docker" | "Local" | "Custom";
   url: string;
   key: string;
-  default_deployment: "Weaviate" | "Docker" | "Local" | "Custom" | "";
+  default_deployment: "Qdrant" | "Docker" | "Local" | "Custom" | "";
 };
 
 export type DocumentFilter = {
@@ -57,10 +57,11 @@ export type HealthPayload = {
   production: "Local" | "Demo" | "Production";
   gtag: string;
   deployments: {
-    WEAVIATE_URL_NEMI: string;
-    WEAVIATE_API_KEY_NEMI: string;
+    QDRANT_HOST: string;
+    QDRANT_PORT: string;
+    QDRANT_API_KEY: string;
   };
-  default_deployment: "Weaviate" | "Docker" | "Local" | "Custom" | "";
+  default_deployment: "Qdrant" | "Docker" | "Local" | "Custom" | "";
 };
 
 export type QueryPayload = {
@@ -279,7 +280,7 @@ type NodeInfo = {
 
 export type NodePayload = {
   node_count: number;
-  weaviate_version: string;
+  qdrant_version: string;
   nodes: NodeInfo[];
 };
 
@@ -588,14 +589,14 @@ export const WCDTheme: Theme = {
   ...LightTheme,
   theme_name: "WCD",
   title: { ...LightTheme.title, text: "Nemi-AI" },
-  subtitle: { ...LightTheme.subtitle, text: "Weaviate Chatbot" },
+  subtitle: { ...LightTheme.subtitle, text: "Qdrant RAG" },
   intro_message: {
     ...LightTheme.intro_message,
     text: "Welcome to Nemi-AI, your open-source RAG application!",
   },
   image: {
     ...LightTheme.image,
-    src: "https://github.com/hieunm14/nemi-ai-fb-marketing-api/blob/1.0.0/frontend/public/weaviate.png?raw=true",
+    src: "https://github.com/hieunm14/nemi-ai-fb-marketing-api/blob/main/img/nemi_icon.png?raw=true",
   },
   primary_color: { ...LightTheme.primary_color, color: "#BF40C5" },
   secondary_color: { ...LightTheme.secondary_color, color: "#28395B" },
@@ -615,18 +616,18 @@ export const WCDTheme: Theme = {
   theme: "dark",
 };
 
-export const WeaviateTheme: Theme = {
+export const QdrantTheme: Theme = {
   ...LightTheme,
-  theme_name: "Weaviate",
+  theme_name: "Qdrant",
   title: { ...LightTheme.title, text: "Nemi-AI" },
-  subtitle: { ...LightTheme.subtitle, text: "Weaviate Chatbot" },
+  subtitle: { ...LightTheme.subtitle, text: "Qdrant RAG" },
   intro_message: {
     ...LightTheme.intro_message,
     text: "Welcome to Nemi-AI, your open-source RAG application!",
   },
   image: {
     ...LightTheme.image,
-    src: "https://github.com/hieunm14/nemi-ai-fb-marketing-api/blob/1.0.0/frontend/public/weaviate.png?raw=true",
+    src: "https://github.com/hieunm14/nemi-ai-fb-marketing-api/blob/main/img/nemi_icon.png?raw=true",
   },
   primary_color: { ...LightTheme.primary_color, color: "#9bfc88" },
   secondary_color: { ...LightTheme.secondary_color, color: "#8bffe7" },

@@ -6,7 +6,6 @@ from fastapi.staticfiles import StaticFiles
 import asyncio
 
 from nemi_ai.server.helpers import LoggerManager, BatchManager
-from weaviate.client import WeaviateAsyncClient
 
 import os
 from pathlib import Path
@@ -142,10 +141,7 @@ async def health_check():
 
     await client_manager.clean_up()
 
-    if production == "Local":
-        deployments = await manager.get_deployments()
-    else:
-        deployments = {"WEAVIATE_URL_NEMI": "", "WEAVIATE_API_KEY_NEMI": ""}
+    deployments = await manager.get_deployments()
 
     return JSONResponse(
         content={
@@ -153,7 +149,7 @@ async def health_check():
             "production": production,
             "gtag": tag,
             "deployments": deployments,
-            "default_deployment": os.getenv("DEFAULT_DEPLOYMENT", ""),
+            "default_deployment": "Qdrant",
         }
     )
 
@@ -162,9 +158,7 @@ async def health_check():
 async def connect_to_nemi(payload: ConnectPayload):
     try:
         client = await client_manager.connect(payload.credentials, payload.port)
-        if isinstance(
-            client, WeaviateAsyncClient
-        ):  # Check if client is an AsyncClient object
+        if client is not None:
             config = await manager.load_rag_config(client)
             user_config = await manager.load_user_config(client)
             theme, themes = await manager.load_theme_config(client)
@@ -180,16 +174,14 @@ async def connect_to_nemi(payload: ConnectPayload):
                 },
             )
         else:
-            raise TypeError(
-                "Couldn't connect to Weaviate, client is not an AsyncClient object"
-            )
+            raise TypeError("Couldn't connect to Qdrant")
     except Exception as e:
-        msg.fail(f"Failed to connect to Weaviate {str(e)}")
+        msg.fail(f"Failed to connect to Qdrant {str(e)}")
         return JSONResponse(
             status_code=400,
             content={
                 "connected": False,
-                "error": f"Failed to connect to Weaviate {str(e)}",
+                "error": f"Failed to connect to Qdrant {str(e)}",
                 "rag_config": {},
                 "theme": {},
                 "themes": {},
@@ -449,7 +441,7 @@ async def query(payload: QueryPayload):
 async def get_document(payload: GetDocumentPayload):
     try:
         client = await client_manager.connect(payload.credentials)
-        document = await manager.weaviate_manager.get_document(
+        document = await manager.qdrant_manager.get_document(
             client,
             payload.uuid,
             properties=[
@@ -494,7 +486,7 @@ async def get_document_count(payload: DatacountPayload):
     try:
         client = await client_manager.connect(payload.credentials)
         document_uuids = [document.uuid for document in payload.documentFilter]
-        datacount = await manager.weaviate_manager.get_datacount(
+        datacount = await manager.qdrant_manager.get_datacount(
             client, payload.embedding_model, document_uuids
         )
         return JSONResponse(
@@ -515,7 +507,7 @@ async def get_document_count(payload: DatacountPayload):
 async def get_labels(payload: Credentials):
     try:
         client = await client_manager.connect(payload)
-        labels = await manager.weaviate_manager.get_labels(client)
+        labels = await manager.qdrant_manager.get_labels(client)
         return JSONResponse(
             content={
                 "labels": labels,
@@ -557,7 +549,7 @@ async def get_content(payload: GetContentPayload):
 async def get_vectors(payload: GetVectorPayload):
     try:
         client = await client_manager.connect(payload.credentials)
-        vector_groups = await manager.weaviate_manager.get_vectors(
+        vector_groups = await manager.qdrant_manager.get_vectors(
             client, payload.uuid, payload.showAll
         )
         return JSONResponse(
@@ -581,7 +573,7 @@ async def get_vectors(payload: GetVectorPayload):
 async def get_chunks(payload: ChunksPayload):
     try:
         client = await client_manager.connect(payload.credentials)
-        chunks = await manager.weaviate_manager.get_chunks(
+        chunks = await manager.qdrant_manager.get_chunks(
             client, payload.uuid, payload.page, payload.pageSize
         )
         return JSONResponse(
@@ -605,7 +597,7 @@ async def get_chunks(payload: ChunksPayload):
 async def get_chunk(payload: GetChunkPayload):
     try:
         client = await client_manager.connect(payload.credentials)
-        chunk = await manager.weaviate_manager.get_chunk(
+        chunk = await manager.qdrant_manager.get_chunk(
             client, payload.uuid, payload.embedder
         )
         return JSONResponse(
@@ -624,12 +616,12 @@ async def get_chunk(payload: GetChunkPayload):
         )
 
 
-## Retrieve and search documents imported to Weaviate
+## Retrieve and search documents imported to Qdrant
 @app.post("/api/get_all_documents")
 async def get_all_documents(payload: SearchQueryPayload):
     try:
         client = await client_manager.connect(payload.credentials)
-        documents, total_count = await manager.weaviate_manager.get_documents(
+        documents, total_count = await manager.qdrant_manager.get_documents(
             client,
             payload.query,
             payload.pageSize,
@@ -637,7 +629,7 @@ async def get_all_documents(payload: SearchQueryPayload):
             payload.labels,
             properties=["title", "extension", "fileSize", "labels", "source", "meta"],
         )
-        labels = await manager.weaviate_manager.get_labels(client)
+        labels = await manager.qdrant_manager.get_labels(client)
 
         msg.good(f"Succesfully retrieved document: {len(documents)} documents")
         return JSONResponse(
@@ -670,7 +662,7 @@ async def delete_document(payload: GetDocumentPayload):
     try:
         client = await client_manager.connect(payload.credentials)
         msg.info(f"Deleting {payload.uuid}")
-        await manager.weaviate_manager.delete_document(client, payload.uuid)
+        await manager.qdrant_manager.delete_document(client, payload.uuid)
         return JSONResponse(status_code=200, content={})
 
     except Exception as e:
@@ -689,13 +681,13 @@ async def reset_nemi(payload: ResetPayload):
     try:
         client = await client_manager.connect(payload.credentials)
         if payload.resetMode == "ALL":
-            await manager.weaviate_manager.delete_all(client)
+            await manager.qdrant_manager.delete_all(client)
         elif payload.resetMode == "DOCUMENTS":
-            await manager.weaviate_manager.delete_all_documents(client)
+            await manager.qdrant_manager.delete_all_documents(client)
         elif payload.resetMode == "CONFIG":
-            await manager.weaviate_manager.delete_all_configs(client)
+            await manager.qdrant_manager.delete_all_configs(client)
         elif payload.resetMode == "SUGGESTIONS":
-            await manager.weaviate_manager.delete_all_suggestions(client)
+            await manager.qdrant_manager.delete_all_suggestions(client)
 
         msg.info(f"Resetting Nemi-AI in ({payload.resetMode}) mode")
 
@@ -711,7 +703,7 @@ async def reset_nemi(payload: ResetPayload):
 async def get_meta(payload: Credentials):
     try:
         client = await client_manager.connect(payload)
-        node_payload, collection_payload = await manager.weaviate_manager.get_metadata(
+        node_payload, collection_payload = await manager.qdrant_manager.get_metadata(
             client
         )
         return JSONResponse(
@@ -738,7 +730,7 @@ async def get_meta(payload: Credentials):
 async def get_suggestions(payload: GetSuggestionsPayload):
     try:
         client = await client_manager.connect(payload.credentials)
-        suggestions = await manager.weaviate_manager.retrieve_suggestions(
+        suggestions = await manager.qdrant_manager.retrieve_suggestions(
             client, payload.query, payload.limit
         )
         return JSONResponse(
@@ -759,7 +751,7 @@ async def get_all_suggestions(payload: GetAllSuggestionsPayload):
     try:
         client = await client_manager.connect(payload.credentials)
         suggestions, total_count = (
-            await manager.weaviate_manager.retrieve_all_suggestions(
+            await manager.qdrant_manager.retrieve_all_suggestions(
                 client, payload.page, payload.pageSize
             )
         )
@@ -782,7 +774,7 @@ async def get_all_suggestions(payload: GetAllSuggestionsPayload):
 async def delete_suggestion(payload: DeleteSuggestionPayload):
     try:
         client = await client_manager.connect(payload.credentials)
-        await manager.weaviate_manager.delete_suggestions(client, payload.uuid)
+        await manager.qdrant_manager.delete_suggestions(client, payload.uuid)
         return JSONResponse(
             content={
                 "status": 200,

@@ -1,41 +1,36 @@
-import os
+"""Main Nemi-AI manager — orchestrates the full RAG pipeline over Qdrant."""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
 import importlib
-import math
 import json
+import math
+import os
+from copy import deepcopy
 from datetime import datetime
 
 from dotenv import load_dotenv
 from wasabi import msg
-import asyncio
-
-from copy import deepcopy
-import hashlib
-
-from nemi_ai.server.helpers import LoggerManager
-from weaviate.client import WeaviateAsyncClient
 
 from nemi_ai.components.document import Document
-from nemi_ai.server.types import (
-    FileConfig,
-    FileStatus,
-    ChunkScore,
-    Credentials,
-)
-
 from nemi_ai.components.managers import (
     ReaderManager,
     ChunkerManager,
     EmbeddingManager,
     RetrieverManager,
     GeneratorManager,
-    WeaviateManager,
+    QdrantManager,
 )
+from nemi_ai.server.helpers import LoggerManager
+from nemi_ai.server.types import FileConfig, FileStatus, ChunkScore, Credentials
 
 load_dotenv()
 
 
 class NemiManager:
-    """Manages all Nemi-AI Components."""
+    """Manages all Nemi-AI Components over Qdrant."""
 
     def __init__(self) -> None:
         self.reader_manager = ReaderManager()
@@ -43,7 +38,7 @@ class NemiManager:
         self.embedder_manager = EmbeddingManager()
         self.retriever_manager = RetrieverManager()
         self.generator_manager = GeneratorManager()
-        self.weaviate_manager = WeaviateManager()
+        self.qdrant_manager = QdrantManager()
         self.rag_config_uuid = "e0adcc12-9bad-4588-8a1e-bab0af6ed485"
         self.theme_config_uuid = "baab38a7-cb51-4108-acd8-6edeca222820"
         self.user_config_uuid = "f53f7738-08be-4d5a-b003-13eb4bf03ac7"
@@ -53,46 +48,48 @@ class NemiManager:
         self.verify_installed_libraries()
         self.verify_variables()
 
-    async def connect(self, credentials: Credentials, port: str = "8177"):
+    async def connect(
+        self, credentials: Credentials, port: str = "6333"
+    ) -> QdrantManager:
+        """Connect to Qdrant.
+
+        ``port`` is ignored when using deployment='Qdrant' (hosted),
+        used as the Qdrant gRPC/HTTP port for 'Docker' / 'Local'.
+        Default port 6333 is the Qdrant HTTP port.
+        """
         start_time = asyncio.get_event_loop().time()
         try:
-            client = await self.weaviate_manager.connect(
-                credentials.deployment, credentials.url, credentials.key, port
+            host = credentials.url or os.getenv("QDRANT_HOST", "localhost")
+            api_key = credentials.key or os.getenv("QDRANT_API_KEY", "")
+            p = int(port or os.getenv("QDRANT_PORT", "6333"))
+
+            client = await self.qdrant_manager.connect(
+                host=host, port=p, api_key=api_key
             )
-        except Exception as e:
-            raise e
-        if client:
-            initialized = await self.weaviate_manager.verify_collection(
-                client, self.weaviate_manager.config_collection_name
-            )
-            if initialized:
+            if client:
                 end_time = asyncio.get_event_loop().time()
                 msg.info(f"Connection time: {end_time - start_time:.2f} seconds")
                 return client
+            raise Exception("Failed to connect to Qdrant")
+        except Exception as e:
+            raise e
 
     async def disconnect(self, client):
         start_time = asyncio.get_event_loop().time()
-        result = await self.weaviate_manager.disconnect(client)
+        result = await self.qdrant_manager.disconnect(client)
         end_time = asyncio.get_event_loop().time()
         msg.info(f"Disconnection time: {end_time - start_time:.2f} seconds")
         return result
 
     async def get_deployments(self):
         deployments = {
-            "WEAVIATE_URL_NEMI": (
-                os.getenv("WEAVIATE_URL_NEMI")
-                if os.getenv("WEAVIATE_URL_NEMI")
-                else ""
-            ),
-            "WEAVIATE_API_KEY_NEMI": (
-                os.getenv("WEAVIATE_API_KEY_NEMI")
-                if os.getenv("WEAVIATE_API_KEY_NEMI")
-                else ""
-            ),
+            "QDRANT_HOST": os.getenv("QDRANT_HOST", "localhost"),
+            "QDRANT_PORT": os.getenv("QDRANT_PORT", "6333"),
+            "QDRANT_API_KEY": os.getenv("QDRANT_API_KEY", ""),
         }
         return deployments
 
-    # Import
+    # ── Import ───────────────────────────────────────────────────
 
     async def import_document(
         self, client, fileConfig: FileConfig, logger: LoggerManager = LoggerManager()
@@ -101,13 +98,13 @@ class NemiManager:
             loop = asyncio.get_running_loop()
             start_time = loop.time()
 
-            duplicate_uuid = await self.weaviate_manager.exist_document_name(
+            duplicate_uuid = await self.qdrant_manager.exist_document_name(
                 client, fileConfig.filename
             )
             if duplicate_uuid is not None and not fileConfig.overwrite:
                 raise Exception(f"{fileConfig.filename} already exists in Nemi-AI")
             elif duplicate_uuid is not None and fileConfig.overwrite:
-                await self.weaviate_manager.delete_document(client, duplicate_uuid)
+                await self.qdrant_manager.delete_document(client, duplicate_uuid)
                 await logger.send_report(
                     fileConfig.fileID,
                     status=FileStatus.STARTING,
@@ -140,14 +137,14 @@ class NemiManager:
                 await logger.send_report(
                     fileConfig.fileID,
                     status=FileStatus.INGESTING,
-                    message=f"Imported {fileConfig.filename} and it's {successful_tasks} documents into Weaviate",
+                    message=f"Imported {fileConfig.filename} and it's {successful_tasks} documents into Qdrant",
                     took=round(loop.time() - start_time, 2),
                 )
             elif successful_tasks == 1:
                 await logger.send_report(
                     fileConfig.fileID,
                     status=FileStatus.INGESTING,
-                    message=f"Imported {fileConfig.filename} and {len(documents[0].chunks)} chunks into Weaviate",
+                    message=f"Imported {fileConfig.filename} and {len(documents[0].chunks)} chunks into Qdrant",
                     took=round(loop.time() - start_time, 2),
                 )
             elif (
@@ -155,9 +152,6 @@ class NemiManager:
                 and len(results) == 1
                 and isinstance(results[0], Exception)
             ):
-                msg.fail(
-                    f"No documents imported {successful_tasks} of {len(results)} succesful tasks"
-                )
                 raise results[0]
             else:
                 raise Exception(
@@ -204,13 +198,13 @@ class NemiManager:
             currentFileConfig = fileConfig
 
         try:
-            duplicate_uuid = await self.weaviate_manager.exist_document_name(
+            duplicate_uuid = await self.qdrant_manager.exist_document_name(
                 client, document.title
             )
             if duplicate_uuid is not None and not currentFileConfig.overwrite:
                 raise Exception(f"{document.title} already exists in Nemi-AI")
             elif duplicate_uuid is not None and currentFileConfig.overwrite:
-                await self.weaviate_manager.delete_document(client, duplicate_uuid)
+                await self.qdrant_manager.delete_document(client, duplicate_uuid)
 
             chunk_task = asyncio.create_task(
                 self.chunker_manager.chunk(
@@ -237,7 +231,7 @@ class NemiManager:
 
             for document in vectorized_documents:
                 ingesting_task = asyncio.create_task(
-                    self.weaviate_manager.import_document(
+                    self.qdrant_manager.import_document(
                         client,
                         document,
                         currentFileConfig.rag_config["Embedder"]
@@ -251,7 +245,7 @@ class NemiManager:
             await logger.send_report(
                 currentFileConfig.fileID,
                 status=FileStatus.INGESTING,
-                message=f"Imported {currentFileConfig.filename} into Weaviate",
+                message=f"Imported {currentFileConfig.filename} into Qdrant",
                 took=round(loop.time() - start_time, 2),
             )
 
@@ -270,11 +264,10 @@ class NemiManager:
             )
             raise Exception(f"Import for {fileConfig.filename} failed: {str(e)}")
 
-    # Configuration
+    # ── Configuration ───────────────────────────────────────────
 
     def create_config(self) -> dict:
-        """Creates the RAG Configuration and returns the full Nemi-AI Config with also Settings"""
-
+        """Creates the RAG Configuration with available components."""
         available_environments = self.environment_variables
         available_libraries = self.installed_libraries
 
@@ -345,17 +338,17 @@ class NemiManager:
         return {"getting_started": False}
 
     async def set_theme_config(self, client, config: dict):
-        await self.weaviate_manager.set_config(client, self.theme_config_uuid, config)
+        await self.qdrant_manager.set_config(client, self.theme_config_uuid, config)
 
     async def set_rag_config(self, client, config: dict):
-        await self.weaviate_manager.set_config(client, self.rag_config_uuid, config)
+        await self.qdrant_manager.set_config(client, self.rag_config_uuid, config)
 
     async def set_user_config(self, client, config: dict):
-        await self.weaviate_manager.set_config(client, self.user_config_uuid, config)
+        await self.qdrant_manager.set_config(client, self.user_config_uuid, config)
 
     async def load_rag_config(self, client):
-        """Check if a Configuration File exists in the database, if yes, check if corrupted. Returns a valid configuration file"""
-        loaded_config = await self.weaviate_manager.get_config(
+        """Load RAG config from Qdrant, creating default if missing."""
+        loaded_config = await self.qdrant_manager.get_config(
             client, self.rag_config_uuid
         )
         new_config = self.create_config()
@@ -372,27 +365,22 @@ class NemiManager:
             return new_config
 
     async def load_theme_config(self, client):
-        loaded_config = await self.weaviate_manager.get_config(
+        loaded_config = await self.qdrant_manager.get_config(
             client, self.theme_config_uuid
         )
-
         if loaded_config is None:
             return None, None
-
-        return loaded_config["theme"], loaded_config["themes"]
+        return loaded_config.get("theme"), loaded_config.get("themes")
 
     async def load_user_config(self, client):
-        loaded_config = await self.weaviate_manager.get_config(
+        loaded_config = await self.qdrant_manager.get_config(
             client, self.user_config_uuid
         )
-
         if loaded_config is None:
             return self.create_user_config()
-
         return loaded_config
 
     def verify_config(self, a: dict, b: dict) -> bool:
-        # Check Settings ( RAG & Settings )
         try:
             if os.getenv("NEMI_PRODUCTION") == "Demo":
                 return True
@@ -462,22 +450,19 @@ class NemiManager:
 
     async def reset_rag_config(self, client):
         msg.info("Resetting RAG Configuration")
-        await self.weaviate_manager.reset_config(client, self.rag_config_uuid)
+        await self.qdrant_manager.reset_config(client, self.rag_config_uuid)
 
     async def reset_theme_config(self, client):
         msg.info("Resetting Theme Configuration")
-        await self.weaviate_manager.reset_config(client, self.theme_config_uuid)
+        await self.qdrant_manager.reset_config(client, self.theme_config_uuid)
 
     async def reset_user_config(self, client):
         msg.info("Resetting User Configuration")
-        await self.weaviate_manager.reset_config(client, self.user_config_uuid)
+        await self.qdrant_manager.reset_config(client, self.user_config_uuid)
 
-    # Environment and Libraries
+    # ── Environment and Libraries ──────────────────────────────
 
     def verify_installed_libraries(self) -> None:
-        """
-        Checks which libraries are installed and fills out the self.installed_libraries dictionary for the frontend to access, this will be displayed in the status page.
-        """
         reader = [
             lib
             for reader in self.reader_manager.readers
@@ -515,9 +500,6 @@ class NemiManager:
                 self.installed_libraries[lib] = False
 
     def verify_variables(self) -> None:
-        """
-        Checks which environment variables are installed and fills out the self.environment_variables dictionary for the frontend to access.
-        """
         reader = [
             lib
             for reader in self.reader_manager.readers
@@ -548,12 +530,9 @@ class NemiManager:
         unique_envs = set(required_envs)
 
         for env in unique_envs:
-            if os.environ.get(env) is not None:
-                self.environment_variables[env] = True
-            else:
-                self.environment_variables[env] = False
+            self.environment_variables[env] = bool(os.environ.get(env))
 
-    # Document Content Retrieval
+    # ── Document Content Retrieval ─────────────────────────────
 
     async def get_content(
         self,
@@ -566,13 +545,12 @@ class NemiManager:
         content_pieces = []
         total_batches = 0
 
-        # Return Chunks with surrounding context
         if len(chunkScores) > 0:
             if page > len(chunkScores):
                 page = 0
 
             total_batches = len(chunkScores)
-            chunk = await self.weaviate_manager.get_chunk(
+            chunk = await self.qdrant_manager.get_chunk(
                 client, chunkScores[page].uuid, chunkScores[page].embedder
             )
 
@@ -584,7 +562,7 @@ class NemiManager:
                 )
             ]
             if before_ids:
-                chunks_before_chunk = await self.weaviate_manager.get_chunk_by_ids(
+                chunks_before_chunk = await self.qdrant_manager.get_chunk_by_ids(
                     client,
                     chunkScores[page].embedder,
                     uuid,
@@ -600,7 +578,7 @@ class NemiManager:
                 )
                 before_content = "".join(
                     [
-                        chunk.properties["content_without_overlap"]
+                        chunk.payload.get("content_without_overlap", "")
                         for chunk in chunks_before_chunk
                     ]
                 )
@@ -615,7 +593,7 @@ class NemiManager:
                 )
             ]
             if after_ids:
-                chunks_after_chunk = await self.weaviate_manager.get_chunk_by_ids(
+                chunks_after_chunk = await self.qdrant_manager.get_chunk_by_ids(
                     client,
                     chunkScores[page].embedder,
                     uuid,
@@ -629,7 +607,7 @@ class NemiManager:
                 )
                 after_content = "".join(
                     [
-                        chunk.properties["content_without_overlap"]
+                        chunk.payload.get("content_without_overlap", "")
                         for chunk in chunks_after_chunk
                     ]
                 )
@@ -644,14 +622,15 @@ class NemiManager:
                     "type": "text",
                 }
             )
-            content_pieces.append(
-                {
-                    "content": chunk["content_without_overlap"],
-                    "chunk_id": chunkScores[page].chunk_id,
-                    "score": chunkScores[page].score,
-                    "type": "extract",
-                }
-            )
+            if chunk:
+                content_pieces.append(
+                    {
+                        "content": chunk.get("content_without_overlap", ""),
+                        "chunk_id": chunkScores[page].chunk_id,
+                        "score": chunkScores[page].score,
+                        "type": "extract",
+                    }
+                )
             content_pieces.append(
                 {
                     "content": after_content,
@@ -661,12 +640,13 @@ class NemiManager:
                 }
             )
 
-        # Return Content based on Page
         else:
-            document = await self.weaviate_manager.get_document(
+            document = await self.qdrant_manager.get_document(
                 client, uuid, properties=["meta"]
             )
-            config = json.loads(document["meta"])
+            if not document:
+                return ([], 0)
+            config = json.loads(document.get("meta", "{}"))
             embedder = config["Embedder"]["config"]["Model"]["value"]
             request_chunk_ids = [
                 i
@@ -676,17 +656,17 @@ class NemiManager:
                 )
             ]
 
-            chunks = await self.weaviate_manager.get_chunk_by_ids(
+            chunks = await self.qdrant_manager.get_chunk_by_ids(
                 client, embedder, uuid, request_chunk_ids
             )
 
-            total_chunks = await self.weaviate_manager.get_chunk_count(
+            total_chunks = await self.qdrant_manager.get_chunk_count(
                 client, embedder, uuid
             )
             total_batches = int(math.ceil(total_chunks / chunks_per_page))
 
             content = "".join(
-                [chunk.properties["content_without_overlap"] for chunk in chunks]
+                [chunk.payload.get("content_without_overlap", "") for chunk in chunks]
             )
 
             content_pieces.append(
@@ -700,7 +680,7 @@ class NemiManager:
 
         return (content_pieces, total_batches)
 
-    # Retrieval Augmented Generation
+    # ── Retrieval Augmented Generation ─────────────────────────
 
     async def retrieve_chunks(
         self,
@@ -713,7 +693,7 @@ class NemiManager:
         retriever = rag_config["Retriever"].selected
         embedder = rag_config["Embedder"].selected
 
-        await self.weaviate_manager.add_suggestion(client, query)
+        await self.qdrant_manager.add_suggestion(client, query)
 
         vector = await self.embedder_manager.vectorize_query(
             embedder, query, rag_config
@@ -724,7 +704,7 @@ class NemiManager:
             query,
             vector,
             rag_config,
-            self.weaviate_manager,
+            self.qdrant_manager,
             labels,
             document_uuids,
         )
@@ -738,7 +718,6 @@ class NemiManager:
         context: str,
         conversation: list[dict],
     ):
-
         full_text = ""
         async for result in self.generator_manager.generate_stream(
             rag_config, query, context, conversation
@@ -769,14 +748,14 @@ class ClientManager:
             msg.info(f"Client {cred_hash} connected at {client['timestamp']}")
 
     async def connect(
-        self, credentials: Credentials, port: str = "8177"
-    ) -> WeaviateAsyncClient:
-
+        self, credentials: Credentials, port: str = "6333"
+    ) -> QdrantManager:
         _credentials = credentials
 
-        if not _credentials.url and not _credentials.key:
-            _credentials.url = os.environ.get("WEAVIATE_URL_NEMI", "")
-            _credentials.key = os.environ.get("WEAVIATE_API_KEY_NEMI", "")
+        if not _credentials.url:
+            _credentials.url = os.environ.get("QDRANT_HOST", "localhost")
+        if not _credentials.key:
+            _credentials.key = os.environ.get("QDRANT_API_KEY", "")
 
         cred_hash = self.hash_credentials(_credentials)
 
@@ -814,9 +793,7 @@ class ClientManager:
             time_difference = current_time - client_data["timestamp"]
             if time_difference.total_seconds() / 60 > self.max_time:
                 clients_to_remove.append(cred_hash)
-            client: WeaviateAsyncClient = client_data["client"]
-            if not await client.is_ready():
-                clients_to_remove.append(cred_hash)
+            client = client_data["client"]
 
         for cred_hash in clients_to_remove:
             await self.manager.disconnect(self.clients[cred_hash]["client"])

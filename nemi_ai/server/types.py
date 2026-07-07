@@ -4,7 +4,7 @@ from enum import Enum
 
 
 class Credentials(BaseModel):
-    deployment: Literal["Weaviate", "Docker", "Local", "Custom"]
+    deployment: Literal["Qdrant", "Docker", "Local", "Custom"]
     url: str
     key: str
 

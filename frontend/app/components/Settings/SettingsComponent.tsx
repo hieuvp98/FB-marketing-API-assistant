@@ -10,7 +10,7 @@ import {
   ColorSetting,
   SelectSetting,
   NumberFieldSetting,
-  WeaviateTheme,
+  QdrantTheme,
   WCDTheme,
   LightTheme,
   DarkTheme,
@@ -52,10 +52,10 @@ const SettingsComponent: React.FC<SettingsComponentProps> = ({
     setThemes({
       Light: LightTheme,
       Dark: DarkTheme,
-      Weaviate: WeaviateTheme,
+      Qdrant: QdrantTheme,
       WCD: WCDTheme,
     });
-    setSelectedTheme(WeaviateTheme);
+    setSelectedTheme(QdrantTheme);
     addStatusMessage("Themes reset", "SUCCESS");
   };
 

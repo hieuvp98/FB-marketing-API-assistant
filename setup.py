@@ -24,7 +24,7 @@ setup(
     ],
     include_package_data=True,
     install_requires=[
-        "weaviate-client==4.9.6",
+        "qdrant-client==1.13.2",
         "python-dotenv==1.0.0",
         "openpyxl==3.1.5",
         "wasabi==1.1.2",
@@ -48,13 +48,4 @@ setup(
         "beautifulsoup4==4.12.3",
         "langdetect==1.0.9",
     ],
-    extras_require={
-        "dev": ["pytest", "wheel", "twine", "black>=23.7.0", "setuptools"],
-        "google": [
-            "vertexai==1.46.0",
-        ],
-        "huggingface": [
-            "sentence-transformers==3.0.1",
-        ],
-    },
 )
